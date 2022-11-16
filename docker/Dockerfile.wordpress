@@ -1,0 +1,181 @@
+ARG PHP_VERSION=8.1
+FROM php:${PHP_VERSION}-fpm as wp-base
+
+# persistent dependencies
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+# Ghostscript is required for rendering PDF previews
+		ghostscript \
+        wget \
+	; \
+	rm -rf /var/lib/apt/lists/*
+
+# install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
+RUN set -ex; \
+	\
+	savedAptMark="$(apt-mark showmanual)"; \
+	\
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		libfreetype6-dev \
+		libicu-dev \
+		libjpeg-dev \
+		libmagickwand-dev \
+		libpng-dev \
+		libwebp-dev \
+		libzip-dev \
+	; \
+	\
+	docker-php-ext-configure gd \
+		--with-freetype \
+		--with-jpeg \
+		--with-webp \
+	; \
+	docker-php-ext-install -j "$(nproc)" \
+		bcmath \
+		exif \
+		gd \
+		intl \
+		mysqli \
+		zip \
+	; \
+# https://pecl.php.net/package/imagick
+	pecl install imagick-3.6.0; \
+	docker-php-ext-enable imagick; \
+	rm -r /tmp/pear; \
+	\
+# some misbehaving extensions end up outputting to stdout 🙈 (https://github.com/docker-library/wordpress/issues/669#issuecomment-993945967)
+	out="$(php -r 'exit(0);')"; \
+	[ -z "$out" ]; \
+	err="$(php -r 'exit(0);' 3>&1 1>&2 2>&3)"; \
+	[ -z "$err" ]; \
+	\
+	extDir="$(php -r 'echo ini_get("extension_dir");')"; \
+	[ -d "$extDir" ]; \
+# reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
+	apt-mark auto '.*' > /dev/null; \
+	apt-mark manual $savedAptMark; \
+	ldd "$extDir"/*.so \
+		| awk '/=>/ { print $3 }' \
+		| sort -u \
+		| xargs -r dpkg-query -S \
+		| cut -d: -f1 \
+		| sort -u \
+		| xargs -rt apt-mark manual; \
+	\
+	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+	rm -rf /var/lib/apt/lists/*; \
+# clean up php.tar.xz
+    rm -rf /usr/src/*; \
+	\
+	! { ldd "$extDir"/*.so | grep 'not found'; }; \
+# check for output like "PHP Warning:  PHP Startup: Unable to load dynamic library 'foo' (tried: ...)
+	err="$(php --version 3>&1 1>&2 2>&3)"; \
+	[ -z "$err" ]
+
+# set recommended PHP.ini settings
+# see https://secure.php.net/manual/en/opcache.installation.php
+RUN set -eux; \
+	docker-php-ext-enable opcache; \
+	{ \
+		echo 'opcache.memory_consumption=128'; \
+		echo 'opcache.interned_strings_buffer=8'; \
+		echo 'opcache.max_accelerated_files=4000'; \
+		echo 'opcache.revalidate_freq=2'; \
+		echo 'opcache.fast_shutdown=1'; \
+	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
+# https://wordpress.org/support/article/editing-wp-config-php/#configure-error-logging
+RUN { \
+# https://www.php.net/manual/en/errorfunc.constants.php
+# https://github.com/docker-library/wordpress/issues/420#issuecomment-517839670
+		echo 'error_reporting = E_ERROR | E_WARNING | E_PARSE | E_CORE_ERROR | E_CORE_WARNING | E_COMPILE_ERROR | E_COMPILE_WARNING | E_RECOVERABLE_ERROR'; \
+		echo 'display_errors = Off'; \
+		echo 'display_startup_errors = Off'; \
+		echo 'log_errors = On'; \
+		echo 'error_log = /dev/stderr'; \
+		echo 'log_errors_max_len = 1024'; \
+		echo 'ignore_repeated_errors = On'; \
+		echo 'ignore_repeated_source = Off'; \
+		echo 'html_errors = Off'; \
+        echo 'expose_php=Off'; \
+	} > /usr/local/etc/php/conf.d/error-logging.ini
+
+ARG CADDY_VERSION="2.6.2"
+# Install Caddy
+RUN set -eux; \
+    apkArch="$(arch)"; \
+    case "$apkArch" in \
+            x86_64)  binArch='amd64'; ;; \
+            armhf)   binArch='armv6'; ;; \
+            armv7)   binArch='armv7'; ;; \
+            aarch64) binArch='arm64'; ;; \
+            ppc64el|ppc64le) binArch='ppc64le'; ;; \
+            s390x)   binArch='s390x'; ;; \
+            *) echo >&2 "error: unsupported architecture ($apkArch)"; exit 1 ;;\
+        esac; \
+    mkdir -p /srv ; \
+    if ! wget -c "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${binArch}.tar.gz"  -O - | \
+        tar --extract --gzip --directory /usr/bin caddy \
+      ; then \
+        echo >&2 "error: failed to download 'caddy_${CADDY_VERSION}_linux_${binArch}.tar.gz'"; \
+        exit 1; \
+    fi; \
+    chmod +x /usr/bin/caddy; \
+    caddy version; \
+    groupadd --system caddy; \
+    useradd --system \
+        --gid caddy \
+        --create-home \
+        --home-dir /var/lib/caddy \
+        --shell /usr/sbin/nologin \
+        --comment "Caddy web server" \
+        caddy; \
+    mkdir -p /var/log/caddy;
+
+ARG WORDPRESS_VERSION='6.1'
+# Install Wordpress
+RUN set -eux; \
+    if ! wget -c "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz"  -O - | \
+        tar --extract --gzip --directory /usr/src/ wordpress \
+      ; then \
+        echo >&2 "error: failed to download 'wordpress-${WORDPRESS_VERSION}.tar.gz'"; \
+        exit 1; \
+    fi; \
+	chown -R caddy:caddy /usr/src/wordpress; \
+# pre-create wp-content (and single-level children) for folks who want to bind-mount themes, etc so permissions are pre-created properly instead of root:root
+# wp-content/cache: https://github.com/docker-library/wordpress/issues/534#issuecomment-705733507
+	mkdir wp-content; \
+	for dir in /usr/src/wordpress/wp-content/*/ cache; do \
+		dir="$(basename "${dir%/}")"; \
+		mkdir "wp-content/$dir"; \
+	done; \
+	chown -R caddy:caddy wp-content; \
+	chmod -R 755 wp-content
+
+COPY --chown=caddy:caddy wp-config-docker.php /usr/src/wordpress/
+COPY usr /usr
+COPY etc /etc
+
+RUN set -uex; \
+    sed -i 's/listen = 9000/listen = \/var\/run\/php-fpm.sock/g' /usr/local/etc/php-fpm.d/zz-docker.conf; \
+    sed -i 's/user = www-data/user = caddy/g' /usr/local/etc/php-fpm.d/www.conf; \
+    sed -i 's/group = www-data/group = caddy/g' /usr/local/etc/php-fpm.d/www.conf;
+
+#Update custom /etc/motd
+RUN set -uex; \
+    PHP_VERSION="$(php -v | head -n 1 | cut -d ' ' -f 2)" \
+    CADDY_VERSION="$(caddy version |  cut -d ' ' -f 1)" \
+    WORDPRESS_VERSION="$(grep -o '\$wp_version = [^"]*' /usr/src/wordpress/wp-includes/version.php | cut -d '=' -f 2)" \
+    sed -i "s/PHP version:/PHP version: $PHP_VERSION/g" /etc/motd; \
+    sed -i "s/Caddy version:/Caddy version: '$CADDY_VERSION'/g" /etc/motd; \
+    sed -i "s/Wordpress version:/Wordpress version: ${WORDPRESS_VERSION%?}/g" /etc/motd;
+
+# Azure App Service only persists contents of /home
+WORKDIR /home/site/wwwroot
+
+EXPOSE 80 443 2222
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+

@@ -1,0 +1,12 @@
+ _    __      ____            _       __                    __        ______________ _    __
+| |  / /___  / / /_____  ____| |     / /__  _____________  / /____   /  _/_  __/ __ ) |  / /
+| | / / __ \/ / //_/ _ \/ ___/ | /| / / _ \/ ___/ ___/ _ \/ / ___/   / /  / / / __  | | / /
+| |/ / /_/ / / ,< /  __/ /   | |/ |/ /  __(__  |__  )  __/ (__  )  _/ /  / / / /_/ /| |/ /
+|___/\____/_/_/|_|\___/_/    |__/|__/\___/____/____/\___/_/____/  /___/ /_/ /_____/ |___/
+
+Documentation: https://github.com/VolkerWessels/wordpress
+PHP version:
+Caddy version:
+Wordpress version:
+
+Note: If run on Azure App Service on Linux any data outside '/home' is not persisted
