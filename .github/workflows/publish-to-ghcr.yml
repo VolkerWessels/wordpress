@@ -1,0 +1,92 @@
+name: Publish Docker image to GitHub
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
+  release:
+    types: [ published ]
+
+jobs:
+  publish_github:
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        containers:
+          - { name: "wordpress", file: "docker/Dockerfile.wordpress", context: "docker/.", php: "8.1", caddy: "2.6.2", wordpress: "6.1"}
+    name: Push '${{ matrix.containers.name }}' image to ghcr.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Set $GIT_SHORT_SHA and $REPOSITORY_OWNER
+        run: |
+          echo "GIT_SHORT_SHA=sha-$(git rev-parse --short HEAD)" >> $GITHUB_ENV;
+          echo "REPOSITORY_OWNER=${REPOSITORY_OWNER,,}" >> $GITHUB_ENV;
+        shell: bash
+        env:
+          REPOSITORY_OWNER: "${{ github.repository_owner }}"
+      - name: Check for semver tag
+        id: semvercheck
+        run: |
+          if [[ ${{ github.ref }} =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            MATCH=true
+          else
+            MATCH=false
+          fi
+          if [[ ! ${{ github.ref }} =~ ^refs/tags/v0\. ]]; then
+            MATCH=$MATCH_nonzero
+          fi
+          echo ::set-output name=match::$MATCH
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          flavor: |
+            latest=${{ github.ref == 'refs/heads/main' }}
+          images: |
+            ghcr.io/${{ env.REPOSITORY_OWNER }}/${{ matrix.containers.name }}
+          tags: |
+            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/main' }}
+            type=ref,event=pr
+            type=ref,event=tag,enable=${{ !startsWith(steps.semvercheck.outputs.match, 'true') }}
+            type=semver,pattern=v{{major}}.{{minor}}.{{patch}},enable=${{ startsWith(steps.semvercheck.outputs.match, 'true') }}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ startsWith(steps.semvercheck.outputs.match, 'true') }}
+            type=semver,pattern=v{{major}},enable=${{ startsWith(steps.semvercheck.outputs.match, 'true_nonzero') }}
+            type=raw,value=latest,enable=${{ !startsWith(steps.semvercheck.outputs.match, 'true') }}
+            type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
+          labels: |
+            org.opencontainers.image.description="WordPress for Azure App Service"
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push to GitHub
+        uses: docker/build-push-action@v2
+        with:
+          file: ${{ matrix.containers.file }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          target: ${{ matrix.containers.taget || '' }}
+          context: ${{ matrix.containers.context || '' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            REGISTRY=ghcr.io/${{ env.REPOSITORY_OWNER }}
+            TAG=${{ env.GIT_SHORT_SHA }}
+
+      - name: Prune '${{ matrix.containers.name }}' images
+        uses: vlaurin/action-ghcr-prune@main
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          organization: VolkerWessels
+          container: ${{ matrix.containers.name }}
+          dry-run: false # Dry-run first, then change to `false`
+          older-than: 7 # days
+          keep-last: 5
+          untagged: true
+          tag-regex: '^sha-[0-9a-z]{7}'
