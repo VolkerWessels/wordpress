@@ -8,11 +8,19 @@
 		}
 		max_header_size 16384
 	}
+
+	local_certs
+	auto_https disable_redirects
 }
 
 import ./config
 
-:80 {
+localhost:443 {
+	tls {
+		on_demand
+		protocols tls1.2 tls1.3
+	}
+
 	root * /home/site/wwwroot
 	import mustheaders
 	import compression
@@ -26,5 +34,5 @@ import ./config
 
 	respond /healthcheck 200
 
-	import logs
+	import logs-stdout
 }

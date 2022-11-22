@@ -1,0 +1,128 @@
+(mustheaders) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includesubdomains; preload; env=HTTPS"
+		Content-Security-Policy "upgrade-insecure-requests"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Xss-Protection "1; mode=block"
+		Feature-Policy "accelerometer 'none'; ambient-light-sensor 'none'; autoplay 'none'; camera 'none'; encrypted-media 'none'; fullscreen 'self'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; midi 'none'; payment 'none'; picture-in-picture *; speaker 'none'; sync-xhr 'none'; usb 'none'; vr 'none'"
+		Expect-CT "max-age=604800"
+		-Server
+	}
+}
+
+(online) {
+	@offline expression `"{args.0}" == "no"`
+	handle @offline {
+		header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex"
+		header Cache-Control "no-cache, no-store, must-revalidate"
+		# Replace remote_ip 192.168.0.0/16 172.17.0.0/12 10.0.0.0/8 127.0.0.1/8  with your own IP
+		# to still be able to access wordpress when in offline/maintenance mode
+		@public_networks not remote_ip 1.1.1.1
+		error @public_networks "Service Unavailable" 503
+	}
+	header X-Robots-Tag "noarchive, notranslate"
+}
+
+(compression) {
+	encode zstd gzip
+}
+
+(caching) {
+	@static {
+		file
+		path *.css *.js *.ico *.gif *.jpg *.jpeg *.png *.svg *.woff
+	}
+	handle @static {
+		header Cache-Control "public, max-age=5184000, must-revalidate"
+	}
+	@nocache {
+		path /wp-admin*
+	}
+	handle @nocache {
+		header Cache-Control "no-cache, no-store, must-revalidate"
+	}
+	handle {
+		header Cache-Control "public, max-age=604800, must-revalidate"
+	}
+	file_server
+}
+
+(security) {
+	# deny all access to these folders
+	@denied_folders path_regexp /(\.git|cache|bin|logs|backup.*|test.*|content|core||php|config|lib|assets|rel|priv|tracker)/.*$
+	respond @denied_folders "Access denied" 403
+
+	# deny running scripts inside core system folders
+	@denied_system_scripts path_regexp /(core|content|test|system|vendor)/.*\.(txt|xml|md|html|yaml|php|pl|py|cgi|twig|sh|bat|yml)$
+	respond @denied_system_scripts "Access denied" 403
+
+	# deny running scripts inside user folder
+	@denied_user_folder path_regexp /user/.*\.(txt|md|yaml|php|pl|py|cgi|twig|sh|bat|yml)$
+	respond @denied_user_folder "Access denied" 403
+
+	# deny access to specific files in the root folder
+	@denied_root_folder path_regexp /(index.php.*|wp-admin.php|wp-login.php|wp-config.php.*|xmlrpc.php|config.production.json|config.development.json|index.js|package.json|renovate.json|.*lock|mix.*|ghost.js|startup.js|\.editorconfig|\.eslintignore|\.eslintrc.json|\.gitattributes|\.gitignore|\.gitmodules|\.npmignore|Gruntfile.js|LICENSE|MigratorConfig.js|LICENSE.txt|composer.lock|composer.json|nginx.conf|web.config|htaccess.txt|\.htaccess)
+	respond @denied_root_folder "Access denied" 403
+
+	# block bad crawlers
+	@badbots header User-Agent "aesop_com_spiderman, alexibot, backweb, batchftp, bigfoot, blackwidow, blowfish, botalot, buddy, builtbottough, bullseye, cheesebot, chinaclaw, cosmos, crescent, curl, custo, da, diibot, disco, dittospyder, dragonfly, drip, easydl, ebingbong, erocrawler, exabot, eyenetie, filehound, flashget, flunky, frontpage, getright, getweb, go-ahead-got-it, gotit, grabnet, grafula, harvest, hloader, hmview, httplib, humanlinks, ilsebot, infonavirobot, infotekies, intelliseek, interget, iria, jennybot, jetcar, joc, justview, jyxobot, kenjin, keyword, larbin, leechftp, lexibot, lftp, libweb, likse, linkscan, linkwalker, lnspiderguy, lwp, magnet, mag-net, markwatch, memo, miixpc, mirror, missigua, moget, nameprotect, navroad, backdoorbot, nearsite, netants, netcraft, netmechanic, netspider, nextgensearchbot, attach, nicerspro, nimblecrawler, npbot, openfind, outfoxbot, pagegrabber, papa, pavuk, pcbrowser, pockey, propowerbot, prowebwalker, psbot, pump, queryn, recorder, realdownload, reaper, reget, true_robot, repomonkey, rma, internetseer, sitesnagger, siphon, slysearch, smartdownload, snake, snapbot, snoopy, sogou, spacebison, spankbot, spanner, sqworm, superbot, superhttp, surfbot, asterias, suzuran, szukacz, takeout, teleport, telesoft, thenomad, tighttwatbot, titan, urldispatcher, turingos, turnitinbot, *vacuum*, vci, voideye, libwww-perl, widow, wisenutbot, wwwoffle, xaldon, xenu, zeus, zyborg, anonymouse, *zip*, *mail*, *enhanc*, *fetch*, *auto*, *bandit*, *clip*, *copier*, *master*, *reaper*, *sauger*, *quester*, *whack*, *picker*, *catch*, *vampire*, *hari*, *offline*, *track*, *craftbot*, *download*, *extract*, *stripper*, *sucker*, *ninja*, *clshttp*, *webspider*, *leacher*, *collector*, *grabber*, *webpictures*, *seo*, *hole*, *copyright*, *check*"
+	respond @badbots "Access denied" 403
+}
+(robots) {
+	header /robots.txt {
+		User-agent:*
+		Allow: /
+
+		User-agent: *
+		Disallow: /*.php$
+		Disallow: /*.inc$
+		Disallow: /*.zip$
+		Disallow: /*.pdf$
+
+		Sitemap: https://{http.request.host.labels.1}.{http.request.host.labels.0}/sitemap.xml
+	}
+	respond /robots.txt 200
+}
+(proxy) {
+	header_up X-Forwarded-Proto {scheme}
+	header_up X-Forwarded-For {remote}
+	header_up X-Real-IP {remote}
+	header_down X-Powered-By "the Holy Spirit"
+	header_down Server "CERN httpd"
+}
+
+(logs) {
+    log {
+        output file /home/LogFiles/caddy/access.log {
+            roll_size 1gb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+    }
+}
+
+(logs-stdout) {
+    log {
+        output stdout
+    }
+}
+
+(handle_error) {
+	handle_errors {
+		@custom_err file /{err.status_code}.html /error.html
+		handle @custom_err {
+			rewrite * {file_match.relative}
+			file_server
+		}
+		respond "{err.status_code} {err.status_text}"
+	}
+}
+
+(php) {
+	php_fastcgi unix//var/run/php-fpm.sock {
+		capture_stderr
+		header_up X-Forwarded-proto https
+	}
+}

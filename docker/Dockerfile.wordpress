@@ -8,6 +8,7 @@ RUN set -eux; \
 # Ghostscript is required for rendering PDF previews
 		ghostscript \
         wget \
+        libnss3-tools \
 	; \
 	rm -rf /var/lib/apt/lists/*
 

@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  db:
+    image: mariadb:latest
+    networks:
+     - backend
+    volumes:
+     - dbdata:/var/lib/mysql
+    restart: always
+    expose:
+     - 3306
+    env_file:
+     - "mariadb.env"
+    healthcheck:
+      test: pidof mariadb || exit 1
+      interval: 120s
+      timeout: 10s
+      retries: 3
+  wordpress:
+    image: ghcr.io/volkerwessels/wordpress:latest
+#    build:
+#      dockerfile: Dockerfile.wordpress
+#      context: docker/.
+#      args:
+#       PHP_VERSION: 8.1
+#       CADDY_VERSION: 2.6.2
+#       WORDPRESS_VERSION: 6.1
+    restart: always
+    networks:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2019:2019"
+    env_file:
+      - "wordpress.env"
+    volumes:
+      - wordpress:/home/site/wwwroot
+      - type: bind
+        source: ./docker/etc/caddy
+        target: /etc/caddy
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.dev", "--adapter", "caddyfile"]
+
+networks:
+  backend:
+
+volumes:
+  dbdata:
+  wordpress:
