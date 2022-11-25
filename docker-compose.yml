@@ -6,12 +6,16 @@ services:
     networks:
      - backend
     volumes:
-     - dbdata:/var/lib/mysql
+     - db:/var/lib/mysql
     restart: always
     expose:
      - 3306
-    env_file:
-     - "mariadb.env"
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
+      MYSQL_USER: MyUser!
+      MYSQL_PASSWORD: MyPassword!
+      MYSQL_DATABASE: wordpress
+      TZ: Europe/Amsterdam
     healthcheck:
       test: pidof mariadb || exit 1
       interval: 120s
@@ -33,8 +37,12 @@ services:
       - "80:80"
       - "443:443"
       - "2019:2019"
-    env_file:
-      - "wordpress.env"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: MyUser!
+      WORDPRESS_DB_PASSWORD: MyPassword!
+      WORDPRESS_DB_NAME: wordpress
+      TZ: Europe/Amsterdam
     volumes:
       - wordpress:/home/site/wwwroot
       - type: bind
@@ -46,5 +54,5 @@ networks:
   backend:
 
 volumes:
-  dbdata:
+  db:
   wordpress:
