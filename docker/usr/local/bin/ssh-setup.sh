@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
 ssh_setup(){
   printf '%b' 'Setting up ssh\t\n'
 
-  REQUIRED_PKG="openssh-server"
-  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed")
+  REQUIRED_PKG="openssh-server openssh-client"
+  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed" || true;)
   if [ "" = "$PKG_OK" ]; then
     printf '%b' "Installing $REQUIRED_PKG\t\n"
     apt update && apt install $REQUIRED_PKG -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y --allow-downgrades --allow-remove-essential --allow-change-held-packages && rm -rf /var/lib/apt/lists/*
@@ -43,12 +44,12 @@ ssh_setup(){
   fi
 
   # Get environment variables to show up in SSH session
-  eval $(printenv | sed -n "s/^\([^=]\+\)=\(.*\)$/export \1=\2/p" | sed 's/"/\\\"/g' | sed '/=/s//="/' | sed 's/$/"/' >> /etc/profile)
+  eval "$(printenv | sed -n "s/^\([^=]\+\)=\(.*\)$/export \1=\2/p" | sed 's/"/\\\"/g' | sed '/=/s//="/' | sed 's/$/"/' >> /etc/profile)"
 
   # starting sshd process
   printf '%b' 'Starting sshd process - defaults to port 2222\t\n'
   SSH_PORT=${SSH_PORT:-2222}
-  sed -i "s/#Port 22/Port $SSH_PORT/g" /etc/ssh/sshd_config
-  /usr/sbin/sshd -e -f /etc/ssh/sshd_config
+  sed -i "s/SSH_PORT/$SSH_PORT/g" /usr/local/etc/sshd_config
+  /usr/sbin/sshd -e -f /usr/local/etc/sshd_config
 }
 
