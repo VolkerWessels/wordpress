@@ -55,6 +55,10 @@ define( 'DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'example password'
  * (However, using "example username" and "example password" in your database is strongly discouraged.  Please use strong, random credentials!)
  */
 
+/** Use SSL (encryption) **/
+define( 'MYSQL_CLIENT_FLAGS', getenv_docker('MYSQL_CLIENT_FLAGS', MYSQLI_CLIENT_SSL));
+define( 'MYSQL_SSL_CA', getenv_docker('MYSQL_SSL_CA', '/etc/ssl/certs/ca-certificates.crt'));
+
 /** Database hostname */
 define( 'DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'mysql') );
 
