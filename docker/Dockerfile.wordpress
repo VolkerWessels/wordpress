@@ -167,10 +167,10 @@ RUN set -uex; \
 RUN set -uex; \
     PHP_VERSION="$(php -v | head -n 1 | cut -d ' ' -f 2)" \
     CADDY_VERSION="$(caddy version |  cut -d ' ' -f 1)" \
-    WORDPRESS_VERSION="$(grep -o '\$wp_version = [^"]*' /usr/src/wordpress/wp-includes/version.php | cut -d '=' -f 2)" \
+    WORDPRESS_VERSION="$(grep -o '\$wp_version = [^"]*' /usr/src/wordpress/wp-includes/version.php | cut -d '=' -f 2 | tr -d \' | tr -d \;)" \
     sed -i "s/PHP version:/PHP version: $PHP_VERSION/g" /etc/motd; \
-    sed -i "s/Caddy version:/Caddy version: '$CADDY_VERSION'/g" /etc/motd; \
-    sed -i "s/Wordpress version:/Wordpress version: ${WORDPRESS_VERSION%?}/g" /etc/motd;
+    sed -i "s/Caddy version:/Caddy version: $CADDY_VERSION/g" /etc/motd; \
+    sed -i "s/Wordpress version:/Wordpress version: $WORDPRESS_VERSION/g" /etc/motd;
 
 # Azure App Service only persists contents of /home
 WORKDIR /home/site/wwwroot
