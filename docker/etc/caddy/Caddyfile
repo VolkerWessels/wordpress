@@ -10,17 +10,20 @@
 	}
 }
 
-import ./config
+import /etc/caddy/config
 
 :80 {
 	root * /home/site/wwwroot
 	import mustheaders
 	import compression
-	# To put site in maintenance mode replace "online yes" with "online no"
-	# Optionally create a 503.html page
-	import online yes
-	import security
-	import caching
+	# To put site in maintenance mode replace "maintenance no" with "maintenance yes"
+    # Optionally create a 503.html page
+    import maintenance no
+    import security
+    # To make wp-admin only accessable for whitelisted IP's replace "wp-admin-secured no"
+    # with "wp-admin-secured yes" and set the WORDPRESS_ADMIN_IP_WHITELIST environment variable
+    import wp-admin-secured yes
+	#import caching
 	import php
 	import handle_error
 
@@ -28,3 +31,4 @@ import ./config
 
 	import logs
 }
+

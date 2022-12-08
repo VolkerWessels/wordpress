@@ -134,7 +134,7 @@ RUN set -eux; \
         caddy; \
     mkdir -p /var/log/caddy;
 
-ARG WORDPRESS_VERSION='6.1'
+ARG WORDPRESS_VERSION='latest'
 # Install Wordpress
 RUN set -eux; \
     if ! wget -c "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz"  -O - | \
@@ -178,5 +178,5 @@ WORKDIR /home/site/wwwroot
 EXPOSE 80 443 2222
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+CMD ["caddy", "run", "--config", "/home/Caddyfile", "--adapter", "caddyfile"]
 

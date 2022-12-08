@@ -95,6 +95,11 @@ if [[ "$1" == caddy* ]] || [ "$1" = 'php-fpm' ]; then
 	fi
 fi
 
+if [ ! -e /home/Caddyfile ]; then
+  echo >&2 "Caddyfile not found in /home - copying now..."
+  install /etc/caddy/Caddyfile --owner="${CADDY_RUN_USER:-caddy}" --group="${CADDY_RUN_GROUP:-caddy}" --target-directory=/home/
+fi
+
 _ENABLE_SSH="${ENABLE_SSH:-false}"
 if [ "$_ENABLE_SSH" = true ] || [ "${WORDPRESS_DEBUG:-false}" = true ]; then
   source "$curr_dir/ssh-setup.sh"
