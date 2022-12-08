@@ -11,8 +11,6 @@ services:
     expose:
      - 3306
     environment:
-      MYSQL_SSL_CA: false
-      MYSQL_CLIENT_FLAGS: false
       MYSQL_RANDOM_ROOT_PASSWORD: yes
       MYSQL_USER: MyUser!
       MYSQL_PASSWORD: MyPassword!
@@ -41,6 +39,7 @@ services:
       - "22:2222"
       - "2019:2019"
     environment:
+      MYSQL_CLIENT_FLAGS: 0
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: MyUser!
       WORDPRESS_DB_PASSWORD: MyPassword!
