@@ -106,6 +106,20 @@ if [ "$_ENABLE_SSH" = true ] || [ "${WORDPRESS_DEBUG:-false}" = true ]; then
   ssh_setup
 fi
 
+printf '%b' '\nWiting /usr/local/etc/php-fpm.d/zz-php-fpm-pool.conf... \t\n'
+
+cat >/usr/local/etc/php-fpm.d/zz-php-fpm-pool.conf <<EOL
+[www]
+pm = ${PHP_FPM_PM:-dynamic}
+pm.max_children = ${PHP_FPM_PM_MAX_CHILDREN:-25}
+pm.start_servers = ${PHP_FPM_PM_MAX_CHILDREN:-10}
+pm.min_spare_servers = ${PHP_FPM_PM_MIN_SPARE_SERVERS:-5}
+pm.max_spare_servers = ${PHP_FPM_PM_MAX_SPARE_SERVERS:-20}
+pm.process_idle_timeout = ${PHP_FPM_PM_PROCESS_IDLE_TIMEOUT:-10s}
+pm.max_requests = ${PHP_FPM_PM_MAX_REQUESTS:-0}
+
+EOL
+
 printf '%b' '\nStarting PHP-FPM & Caddy...\t\n'
 
 # first arg is `-f` or `--some-option`
