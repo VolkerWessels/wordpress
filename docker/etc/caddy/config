@@ -51,25 +51,25 @@
 
 (security) {
 	# deny all access to these folders
-	@denied_folders path_regexp /(\.git|cache|bin|logs|backup.*|test.*|content|core|php|config|lib|assets|rel|priv|tracker)/.*$
-	respond @denied_folders "Access denied" 403
+	@denied_folders path_regexp /(\.git|cache|bin|logs|backup.*|test.*|content|core|php|config|lib|rel|priv|tracker)/.*$
+	respond @denied_folders "Access denied - 1" 403
 
 	# deny running scripts inside core system folders
 	@denied_system_scripts path_regexp /(core|content|test|system|vendor)/.*\.(txt|xml|md|html|yaml|php|pl|py|cgi|twig|sh|bat|yml)$
-	respond @denied_system_scripts "Access denied" 403
+	respond @denied_system_scripts "Access denied - 2" 403
 
 	# deny running scripts inside user folder
 	@denied_user_folder path_regexp /user/.*\.(txt|md|yaml|php|pl|py|cgi|twig|sh|bat|yml)$
-	respond @denied_user_folder "Access denied" 403
+	respond @denied_user_folder "Access denied - 3" 403
 
 	# block bad crawlers
 	@badbots header User-Agent "aesop_com_spiderman, alexibot, backweb, batchftp, bigfoot, blackwidow, blowfish, botalot, buddy, builtbottough, bullseye, cheesebot, chinaclaw, cosmos, crescent, curl, custo, da, diibot, disco, dittospyder, dragonfly, drip, easydl, ebingbong, erocrawler, exabot, eyenetie, filehound, flashget, flunky, frontpage, getright, getweb, go-ahead-got-it, gotit, grabnet, grafula, harvest, hloader, hmview, httplib, humanlinks, ilsebot, infonavirobot, infotekies, intelliseek, interget, iria, jennybot, jetcar, joc, justview, jyxobot, kenjin, keyword, larbin, leechftp, lexibot, lftp, libweb, likse, linkscan, linkwalker, lnspiderguy, lwp, magnet, mag-net, markwatch, memo, miixpc, mirror, missigua, moget, nameprotect, navroad, backdoorbot, nearsite, netants, netcraft, netmechanic, netspider, nextgensearchbot, attach, nicerspro, nimblecrawler, npbot, openfind, outfoxbot, pagegrabber, papa, pavuk, pcbrowser, pockey, propowerbot, prowebwalker, psbot, pump, queryn, recorder, realdownload, reaper, reget, true_robot, repomonkey, rma, internetseer, sitesnagger, siphon, slysearch, smartdownload, snake, snapbot, snoopy, sogou, spacebison, spankbot, spanner, sqworm, superbot, superhttp, surfbot, asterias, suzuran, szukacz, takeout, teleport, telesoft, thenomad, tighttwatbot, titan, urldispatcher, turingos, turnitinbot, *vacuum*, vci, voideye, libwww-perl, widow, wisenutbot, wwwoffle, xaldon, xenu, zeus, zyborg, anonymouse, *zip*, *mail*, *enhanc*, *fetch*, *auto*, *bandit*, *clip*, *copier*, *master*, *reaper*, *sauger*, *quester*, *whack*, *picker*, *catch*, *vampire*, *hari*, *offline*, *track*, *craftbot*, *download*, *extract*, *stripper*, *sucker*, *ninja*, *clshttp*, *webspider*, *leacher*, *collector*, *grabber*, *webpictures*, *seo*, *hole*, *copyright*, *check*"
-	respond @badbots "Access denied" 403
+	respond @badbots "Access denied - 4" 403
 }
 
 (wp-admin-secured) {
     # deny access to specific files in the root folder
-    @admin_enabled expression `"{args.0}" == "no"`
+    @admin_enabled expression `"{args.0}" == "yes"`
     handle @admin_enabled {
         @denied_root_folder path_regexp /(index.php.*|wp-admin.php|wp-login.php|wp-config.php.*|xmlrpc.php|config.production.json|config.development.json|package.json|renovate.json|mix.*|\.editorconfig|\.eslintignore|\.eslintrc.json|\.gitattributes|\.gitignore|\.gitmodules|\.npmignore|LICENSE|LICENSE.txt|composer.lock|composer.json|nginx.conf|web.config|htaccess.txt|\.htaccess)
         @public_networks not remote_ip forwarded {$WORDPRESS_ADMIN_IP_WHITELIST:192.168.0.0/16 172.16.0.0/12 10.0.0.0/8 127.0.0.1/8}
