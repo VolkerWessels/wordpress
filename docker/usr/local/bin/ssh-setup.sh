@@ -12,7 +12,7 @@ ssh_setup(){
   fi
 
   echo "root:Docker!" | chpasswd
-  usermod --shell /bin/sh --home /home root
+  usermod --shell /bin/sh root
 
   if [ ! -f "/etc/ssh/ssh_host_rsa_key" ]; then
     # generate fresh rsa key
