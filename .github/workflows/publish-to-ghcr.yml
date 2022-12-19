@@ -78,7 +78,7 @@ jobs:
           file: ${{ matrix.containers.file }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          target: ${{ matrix.containers.taget || '' }}
+          target: ${{ matrix.containers.target || '' }}
           context: ${{ matrix.containers.context || '' }}
           push: ${{ github.event_name != 'pull_request' }}
           build-args: |
