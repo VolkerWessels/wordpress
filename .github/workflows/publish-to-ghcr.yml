@@ -17,7 +17,8 @@ jobs:
       max-parallel: 1
       matrix:
         containers:
-          - { name: "wordpress", file: "docker/Dockerfile.wordpress", pull: "wordpress:latest", context: "docker/.", php: "8.1", caddy: "2.6.2", wordpress: "6.1.1"}
+          - { name: "wordpress", file: "docker/Dockerfile.wordpress", target: "wordpress", pull: "wordpress:latest", context: "docker/.", php: "8.1", caddy: "2.6.2", wordpress: "6.1.1"}
+          - { name: "wordpress-node", file: "docker/Dockerfile.wordpress", target: "node", pull: "wordpress:latest", context: "docker/.", php: "8.1", caddy: "2.6.2", wordpress: "6.1.1", node: "18.12.1", yarn: "1.22.19"}
     name: Push '${{ matrix.containers.name }}' image to ghcr.io
     runs-on: ubuntu-latest
     steps:
@@ -85,6 +86,8 @@ jobs:
             PHP_VERSION=${{ matrix.containers.php }}
             CADDY_VERSION=${{ matrix.containers.caddy }}
             WORDPRESS_VERSION=${{ matrix.containers.wordpress }}
+            NODE_VERSION=${{ matrix.containers.node || ''}}
+            YARN_VERSION=${{ matrix.containers.yarn || ''}}
 
       - name: Prune '${{ matrix.containers.name }}' images
         uses: vlaurin/action-ghcr-prune@main
