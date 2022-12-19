@@ -102,6 +102,8 @@ RUN { \
         echo 'expose_php=Off'; \
 	} > /usr/local/etc/php/conf.d/error-logging.ini
 
+FROM wp-base as caddy
+
 ARG CADDY_VERSION="2.6.2"
 # Install Caddy
 RUN set -eux; \
@@ -134,11 +136,13 @@ RUN set -eux; \
         caddy; \
     mkdir -p /var/log/caddy;
 
+FROM caddy as wordpress
+
 ARG WORDPRESS_VERSION='latest'
 # Install Wordpress
 RUN set -eux; \
     if ! wget -c "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz"  -O - | \
-        tar --extract --gzip --directory /usr/src/ wordpress \
+        tar --extract --gzip --no-same-owner --directory /usr/src/ wordpress \
       ; then \
         echo >&2 "error: failed to download 'wordpress-${WORDPRESS_VERSION}.tar.gz'"; \
         exit 1; \
@@ -180,3 +184,39 @@ EXPOSE 80 443 2222
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["caddy", "run", "--config", "/home/Caddyfile", "--adapter", "caddyfile"]
 
+FROM wordpress as node
+
+ARG NODE_VERSION=18.12.1
+# Install Nodejs
+RUN set -eux; \
+    binArch= && dpkgArch="$(dpkg --print-architecture)"; \
+    case "${dpkgArch##*-}" in \
+            amd64) binArch='x64';; \
+            ppc64el) binArch='ppc64le';; \
+            s390x) binArch='s390x';; \
+            arm64) binArch='arm64';; \
+            armhf) binArch='armv7l';; \
+            i386) binArch='x86';; \
+            *) echo >&2 "error: unsupported architecture ($apkArch)"; exit 1 ;;\
+        esac; \
+    if ! wget -c "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${binArch}.tar.gz"  -O - | \
+        tar --extract --gzip --no-same-owner --directory /usr/local --strip-components 1 --exclude=LICENCE --exclude=*.md \
+      ; then \
+        echo >&2 "error: failed to download 'v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${binArch}.tar.gz'"; \
+        exit 1; \
+    fi; \
+	ln -s /usr/local/bin/node /usr/local/bin/nodejs; \
+    echo >&2 "Nodejs version $(node --version) >> /etc/motd"; \
+    echo >&2 "NPM version $(npm --version) >> /etc/motd";
+
+ARG YARN_VERSION=1.22.19
+RUN set -eux; \
+    npm install --global "yarn@${YARN_VERSION}"
+
+# Azure App Service only persists contents of /home
+WORKDIR /home/site/wwwroot
+
+EXPOSE 80 443 2222
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["caddy", "run", "--config", "/home/Caddyfile", "--adapter", "caddyfile"]
